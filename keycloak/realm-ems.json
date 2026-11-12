@@ -1,0 +1,131 @@
+{
+  "realm": "ems",
+  "displayName": "Employee Management System",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      { "name": "ADMIN", "description": "Full access to the Employee Management System" },
+      { "name": "HR_MANAGER", "description": "Manages employee and department records" },
+      { "name": "EMPLOYEE", "description": "Access to their own data only" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ems-api",
+      "name": "EMS API",
+      "description": "Resource server. Tokens issued for the other clients carry this client as their audience.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "ems-frontend",
+      "name": "EMS Frontend",
+      "description": "The React single-page application",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:5173",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:9000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:9000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*##http://localhost:9000/*"
+      },
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "basic", "email"],
+      "protocolMappers": [
+        {
+          "name": "ems-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "ems-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "ems-dev-tools",
+      "name": "EMS Dev Tools (LOCAL TESTING ONLY)",
+      "description": "Lets you fetch tokens with curl. Must never exist in a production realm.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "basic", "email"],
+      "protocolMappers": [
+        {
+          "name": "ems-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "ems-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin.user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Admin",
+      "email": "admin.user@example.test",
+      "credentials": [{ "type": "password", "value": "Admin#12345", "temporary": false }],
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "username": "hr.manager",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Henry",
+      "lastName": "Manager",
+      "email": "hr.manager@example.test",
+      "credentials": [{ "type": "password", "value": "HrManager#12345", "temporary": false }],
+      "realmRoles": ["HR_MANAGER"]
+    },
+    {
+      "username": "jane.employee",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Jane",
+      "lastName": "Employee",
+      "email": "jane.employee@example.test",
+      "credentials": [{ "type": "password", "value": "Employee#12345", "temporary": false }],
+      "realmRoles": ["EMPLOYEE"]
+    }
+  ]
+}
