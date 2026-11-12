@@ -1,0 +1,48 @@
+# Runs the build and all tests on every pull request into develop or main.
+# This is the check that must be green before a pull request can be merged.
+
+name: Code Test
+
+on:
+  pull_request:
+    branches: [ "develop", "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write         # lets the test report publish a check run
+  pull-requests: write  # lets the test report comment on the pull request
+
+concurrency:
+  group: code-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TZ: Africa/Nairobi
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and run tests
+        run: mvn --batch-mode --no-transfer-progress verify
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            target/surefire-reports/**/*.xml
+            target/failsafe-reports/TEST-*.xml

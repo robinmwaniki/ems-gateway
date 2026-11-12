@@ -1,0 +1,116 @@
+# Runs when code is merged into "main" (production).
+#   1. publish: builds the Docker image and pushes it to GitHub Container Registry
+#      (ghcr.io) as :latest plus an immutable :sha-<commit> tag for rollbacks.
+#   2. deploy: updates the production server over SSH. It only runs once the
+#      repository variable DEPLOY_HOST has been set. It uses the "production"
+#      environment, so you can require your own approval before it starts
+#      (Settings -> Environments -> production -> Required reviewers).
+
+name: Code Deploy Prd
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  publish:
+    name: Publish image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      packages: write   # required to push to ghcr.io
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          provenance: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to production
+    needs: publish
+    if: vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    # Never run two deployments to the same server at once.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Deploy over SSH
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+          # Pull the new image and restart only what changed.
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd '$DEPLOY_PATH' && docker compose pull && docker compose up -d"
+
+      - name: Smoke test
+        if: vars.HEALTHCHECK_URL != ''
+        env:
+          HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL }}
+        run: |
+          set -euo pipefail
+
+          # The application may need a little time to start.
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error --max-time 10 "$HEALTHCHECK_URL"; then
+              echo
+              echo "Healthy after attempt $attempt."
+              exit 0
+            fi
+            echo "Attempt $attempt failed, retrying in 5 seconds..."
+            sleep 5
+          done
+
+          echo "::error::The health check at $HEALTHCHECK_URL did not pass."
+          exit 1
