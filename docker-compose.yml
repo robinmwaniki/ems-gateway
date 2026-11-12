@@ -1,0 +1,28 @@
+name: ems-gateway-local
+
+# Local development setup. The three "stub" services only echo back the
+# requests they receive, so you can see exactly what the gateway forwarded.
+# Replace them with the real applications as they become ready.
+services:
+  gateway:
+    build: .
+    ports:
+      - "9000:9000"
+    environment:
+      EMS_API_URL: http://api-stub:80
+      FINANCE_URL: http://finance-stub:80
+      FRONTEND_URL: http://frontend-stub:80
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+    depends_on:
+      - api-stub
+      - finance-stub
+      - frontend-stub
+
+  api-stub:
+    image: traefik/whoami:latest
+
+  finance-stub:
+    image: traefik/whoami:latest
+
+  frontend-stub:
+    image: traefik/whoami:latest
