@@ -7,6 +7,16 @@ spring:
     name: ems-gateway
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Tokens must be issued by this realm and be meant for the EMS API.
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/ems}
+          # Because the key set URL is given explicitly, the gateway does not
+          # contact Keycloak at startup. Keys are fetched on the first request.
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/ems/protocol/openid-connect/certs}
+          audiences: ems-api
   cloud:
     gateway:
       server:
